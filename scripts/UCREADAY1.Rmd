@@ -1,0 +1,85 @@
+---
+title: "UCREA_day1"
+author: "VerónicaGC"
+date: '2024-05-31'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+library(lme4)
+library (foreign)
+library (reshape)
+library (arm)
+library (psy)
+library (car)
+library (plyr)
+library (psychometric)
+library (ICC)
+library (ppcor)
+library (Hmisc)
+library (lm.beta)
+library (GeneNet)
+library (psych)
+library(sjPlot)
+library(stargazer)
+library(dplyr)
+library(tidyverse)
+library(corrplot)
+source("http://www.sthda.com/upload/rquery_cormat.r")
+library(mice)
+
+
+#Read in data file
+
+
+
+library(readxl)
+UCREA_day1<- read_excel("2024/UCREA_day1_R.xlsx")
+View(UCREA_day1)
+
+
+#Normality Recognition 
+```{r warning=F, message=F, echo=T}
+describe(UCREA_day1$Recog)
+hist(UCREA_day1$Recog) #normal
+
+#Normality Recall
+
+describe(UCREA_day1$Recall)
+hist(UCREA_day1$Recall) #normal
+
+#GLM Recogntion
+Recog=glm(Recog~Condition*L1+vocab,data=UCREA_day1,family="binomial")
+summary(Recog)
+tab_model(Recog)
+
+#Correlations
+```{r warning=F, message=F, echo=T}
+my_data <- UCREA_day1[, c(2,14,19,21)]
+head(my_data, 19)
+
+co <- rcorr(as.matrix(my_data), type= c("pearson"))
+co
+
+#GLM Recall
+
+Recall=glm(Recall~Condition*L1+vocab,data=UCREA_day1,family="binomial")
+summary(Recall)
+tab_model(Recall)
+
+
+#Correlations
+```{r warning=F, message=F, echo=T}
+my_data1 <- UCREA_day1[, c(2,14,19,20)]
+head(my_data1, 19)
+
+co1 <- rcorr(as.matrix(my_data1), type= c("pearson"))
+co1
+
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

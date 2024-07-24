@@ -1,0 +1,535 @@
+---
+title: Statistical analysis
+subtitle: Bioacoustics stimuli for L2 learning
+author: <a href="http://researcher.website.com/">Researcher name</a>
+date: "`r Sys.Date()`"
+toc: true
+toc-depth: 4
+toc-location: left
+number-sections: true
+highlight-style: pygments
+format:
+  html:
+    df-print: kable
+    code-fold: true
+    code-tools: true
+    css: qmd.css
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r set root directory, echo = FALSE}
+
+# set working directory 
+knitr::opts_knit$set(root.dir =  "..")
+
+```
+
+```{r add link to github repo, echo = FALSE, results='asis'}
+
+# print link to github repo if any
+if (file.exists("./.git/config")){
+  config <- readLines("./.git/config")
+  url <- grep("url",  config, value = TRUE)
+  url <- gsub("\\turl = |.git$", "", url)
+  cat("\nSource code and data found at [", url, "](", url, ")", sep = "")
+  }
+
+```
+
+```{r setup style, echo = FALSE, message = FALSE, warning=FALSE}
+
+# options to customize chunk outputs
+knitr::opts_chunk$set(
+  tidy.opts = list(width.cutoff = 65), 
+  tidy = TRUE,
+  message = FALSE
+ )
+
+```
+
+
+<!-- skyblue box -->
+
+::: {.alert .alert-info}
+
+# Purpose {.unnumbered .unlisted}
+
+- The first goal of this report
+
+- The second goal of this report
+
+:::
+
+&nbsp; 
+
+
+<!-- light brown box -->
+::: {.alert .alert-warning}
+
+# Report overview {.unnumbered .unlisted}
+
+- You can have the sections listed here, for instance:
+
+  - [Lorem ipsum](#lorem-ipsum)
+  - [Takeaways](#takeaways)
+
+:::
+
+&nbsp;
+
+# Analysis flowchart {.unnumbered .unlisted}
+```{mermaid, fig.align = "center"}
+flowchart
+  A[Read data] --> B(Format data) 
+  B --> C(Graphs)
+  C --> D(Statistical analysis)
+  D --> E(Model summary) 
+
+style A fill:#44015466
+style B fill:#3E4A894D
+style C fill:#26828E4D
+style D fill:#6DCD594D
+
+```
+
+
+# Load packages {.unnumbered .unlisted}
+
+```{r load packages}
+
+# knitr is require for creating html/pdf/word reports
+# formatR is used for soft-wrapping code
+
+# install/ load packages
+sketchy::load_packages(packages = c("lme4", "psych", "sjPlot", "corrplot", "readxl", "Hmisc", "brms", "emmeans", "viridis"))
+
+source("~/Dropbox/R_package_testing/brmsish/R/helpers.R")
+source("~/Dropbox/R_package_testing/brmsish/R/extended_summary.R")
+```
+
+# Read data
+```{r, warning=FALSE}
+
+dat_day_1 <- read_excel("./data/raw/UCREA_day1_R.xlsx")
+
+dat_day_2_online <- read_excel("./data/raw/UCREA_day2_LDT_R (2).xlsx", sheet = "Day 2_no_fillers_LDT")
+
+dat_day_3_online <- read_excel("./data/raw/UCREA_day3_LDT_Acu_FINAL (1).xlsx")
+
+dat_day_2_pldt <- read_excel("./data/raw/PLDT_day2RT_processed (1).xlsx")
+
+dat_day_3_pldt <- read_excel("./data/raw/PLDT_day3_R_FINAL (1).xlsx", sheet = "Data")
+
+```
+
+
+
+# Regression models
+
+## Recognition
+
+```{r, eval = FALSE, warning=F, message=F, echo=T}
+
+dat_day_1$condition_f <- factor(as.character(dat_day_1$Condition))
+dat_day_1$ID <- factor(as.character(dat_day_1$ID))
+
+levels(dat_day_1$condition_f) <- c("Linguistic", "Bioacoustic", "Combined")
+
+dat_day_1$L1_f <- factor(as.character(dat_day_1$L1))
+
+levels(dat_day_1$L1_f) <- c("Native", "Non-native")
+
+dat_day_1$vocab_sc <- scale(dat_day_1$vocab)
+
+priors <- c(prior(normal(0, 4), class = "b"))
+priors <- c(
+  # Prior for the intercept
+  prior(normal(0, 10), class = Intercept),
+  
+  # Priors for the regression coefficients
+  prior(normal(0, 2.5), class = b),
+  
+  # Prior for the group-level standard deviations (if applicable)
+  prior(exponential(1), class = sd)
+)
+
+chains  <- 4 
+
+mod_recognition <- brm(formula = Recog ~ condition_f * L1_f + vocab_sc + (1 | ID) + (1 | nonword), family = bernoulli(), iter = 5000, chains = chains, cores = chains, data = dat_day_1, backend = "cmdstanr", file = "./data/processed/regression_model_day_1_recognition", prior = priors)
+
+mod_recall <- brm(formula = Recall ~ condition_f * L1_f + vocab_sc + (1 | ID) + (1 | nonword), family = bernoulli(), iter = 5000, chains = chains, cores = chains, data = dat_day_1, backend = "cmdstanr", file = "./data/processed/regression_model_day_1_recall", prior = priors)
+```
+
+```{r, warning=F, message=F, echo=T, results='asis'}
+mod_recognition <- readRDS("./data/processed/regression_model_day_1_recognition.rds")
+
+extended_summary(fit = mod_recognition, highlight = TRUE, remove.intercepts = TRUE,
+            print.name = FALSE)
+```
+
+### Contrasts
+
+#### Full table
+```{r, warning=F, message=F, echo=T, results='asis'}
+contrasts_recognition <- as.data.frame(emmeans(mod_recognition, pairwise ~ condition_f * L1_f)$contrasts)
+
+names(contrasts_recognition)[3:4] <- c("l-95% CI", "u-95% CI")
+
+coef_table <- html_format_coef_table(contrasts_recognition, highlight = TRUE, fill = viridis(10)[7])
+
+print(coef_table)
+```
+
+#### Subset native vs non-native
+```{r, warning=F, message=F, echo=T, results='asis'}
+contrasts_recognition$first <- sapply(strsplit(contrasts_recognition$contrast, " - "), "[[", 1)
+contrasts_recognition$second <- sapply(strsplit(contrasts_recognition$contrast, " - "), "[[", 2)
+
+contrasts_recognition <- contrasts_recognition[!grepl("Non-native", contrasts_recognition$first) & grepl("Non-native", contrasts_recognition$second), ]
+
+coef_table <- html_format_coef_table(contrasts_recognition[, 1:4], highlight = TRUE, fill = viridis(10)[7])
+
+print(coef_table)
+
+```
+
+## Recall
+```{r, eval = FALSE, warning=F, message=F, echo=T}
+
+dat_day_1$condition_f <- factor(as.character(dat_day_1$Condition))
+dat_day_1$ID <- factor(as.character(dat_day_1$ID))
+
+levels(dat_day_1$condition_f) <- c("Linguistic", "Bioacoustic", "Combined")
+
+dat_day_1$L1_f <- factor(as.character(dat_day_1$L1))
+
+levels(dat_day_1$L1_f) <- c("Native", "Non-native")
+
+dat_day_1$vocab_sc <- scale(dat_day_1$vocab)
+
+priors <- c(prior(normal(0, 4), class = "b"))
+priors <- c(
+  # Prior for the intercept
+  prior(normal(0, 10), class = Intercept),
+  
+  # Priors for the regression coefficients
+  prior(normal(0, 2.5), class = b),
+  
+  # Prior for the group-level standard deviations (if applicable)
+  prior(exponential(1), class = sd)
+)
+
+chains  <- 4 
+
+mod_recall <- brm(formula = Recall ~ condition_f * L1_f + vocab_sc + (1 | ID) + (1 | nonword), family = bernoulli(), iter = 5000, chains = chains, cores = chains, data = dat_day_1, backend = "cmdstanr", file = "./data/processed/regression_model_day_1_recall", prior = priors)
+```
+
+```{r, results='asis'}
+mod_recall <- readRDS("./data/processed/regression_model_day_1_recall.rds")
+
+extended_summary(fit = mod_recall, highlight = TRUE, remove.intercepts = TRUE,
+            print.name = FALSE)
+```
+
+### Contrasts
+
+#### Full table
+```{r, results='asis'}
+constrasts_recall <- as.data.frame(emmeans(mod_recall, pairwise ~ condition_f * L1_f)$contrasts)
+
+names(constrasts_recall)[3:4] <- c("l-95% CI", "u-95% CI")
+
+coef_table <- html_format_coef_table(constrasts_recall[, 1:4], highlight = TRUE, fill = viridis(10)[7])
+
+print(coef_table)
+```
+
+#### Subset native vs non-native
+```{r, results='asis'}
+constrasts_recall$first <- sapply(strsplit(constrasts_recall$contrast, " - "), "[[", 1)
+constrasts_recall$second <- sapply(strsplit(constrasts_recall$contrast, " - "), "[[", 2)
+
+constrasts_recall <- constrasts_recall[!grepl("Non-native", constrasts_recall$first) & grepl("Non-native", constrasts_recall$second), ]
+
+coef_table <- html_format_coef_table(constrasts_recall[, 1:4], highlight = TRUE, fill = viridis(10)[7])
+
+print(coef_table)
+
+```
+
+## LDT
+
+### Day 2
+```{r, eval = FALSE, warning=F, message=F, echo=T}
+
+str(dat_day_2_online)
+
+dat_day_2_online$condition_f <- factor(as.character(dat_day_2_online$Condition))
+levels(dat_day_2_online$condition_f) <- c("Linguistic", "Bioacoustic", "Combined")
+
+dat_day_2_online$relate_f <- factor(as.character(dat_day_2_online$Relate))
+levels(dat_day_2_online$relate_f) <- c("Related", "Unrelated", "Nonword")
+
+dat_day_2_online$ID <- factor(as.character(dat_day_2_online$ID))
+
+dat_day_2_online$L1_f <- factor(as.character(dat_day_2_online$L1))
+
+levels(dat_day_2_online$L1_f) <- c("Native", "Non-native")
+
+dat_day_2_online$vocab_sc <- scale(dat_day_2_online$Vocab)
+
+dat_day_2_online$recall_f <- factor(as.character(dat_day_2_online$Recall))
+
+levels(dat_day_2_online$recall_f) <- c("No", "Yes")
+
+priors <- c(
+  # Prior for the intercept
+  prior(normal(0, 10), class = Intercept),
+  
+  # Priors for the regression coefficients
+  prior(normal(0, 2.5), class = b),
+  
+  # Prior for the group-level standard deviations (if applicable)
+  prior(exponential(1), class = sd)
+)
+
+chains  <- 4 
+
+mod_LDT <- brm(formula = RT ~ L1_f + condition_f + vocab_sc + relate_f + recall_f +(1 | ID) + (1 | prime), family = lognormal(), iter = 5000, chains = chains, cores = chains, data = dat_day_2_online, backend = "cmdstanr", file = "./data/processed/regression_model_day_2_LDT", prior = priors)
+
+```
+
+```{r, warning=F, message=F, echo=T, results='asis'}
+mod_LDT <- readRDS("./data/processed/regression_model_day_2_LDT.rds")
+
+extended_summary(fit = mod_LDT, highlight = TRUE, remove.intercepts = TRUE,
+            print.name = FALSE)
+```
+
+#### Contrasts
+
+```{r, warning=F, message=F, echo=T, results='asis'}
+
+contrasts_LDT <- as.data.frame(emmeans(mod_LDT, pairwise ~ condition_f)$contrasts)
+
+names(contrasts_LDT)[3:4] <- c("l-95% CI", "u-95% CI")
+
+coef_table <- html_format_coef_table(contrasts_LDT, highlight = TRUE, fill = viridis(10)[7])
+
+print(coef_table)
+
+```
+
+### Day 3
+```{r, eval = FALSE, warning=F, message=F, echo=T}
+
+str(dat_day_3_online)
+
+dat_day_3_online$condition_f <- factor(as.character(dat_day_3_online$Condition))
+levels(dat_day_3_online$condition_f) <- c("Linguistic", "Bioacoustic", "Combined")
+
+dat_day_3_online$relate_f <- factor(as.character(dat_day_3_online$Relate))
+levels(dat_day_3_online$relate_f) <- c("Related", "Unrelated", "Nonword")
+
+dat_day_3_online$ID <- factor(as.character(dat_day_3_online$ID))
+
+dat_day_3_online$L1_f <- factor(as.character(dat_day_3_online$L1))
+
+levels(dat_day_3_online$L1_f) <- c("Native", "Non-native")
+
+dat_day_3_online$vocab_sc <- scale(dat_day_3_online$Vocab)
+
+dat_day_3_online$recall_f <- factor(as.character(dat_day_3_online$Recall))
+
+levels(dat_day_3_online$recall_f) <- c("No", "Yes")
+
+
+priors <- c(
+  # Prior for the intercept
+  prior(normal(0, 10), class = Intercept),
+  
+  # Priors for the regression coefficients
+  prior(normal(0, 2.5), class = b),
+  
+  # Prior for the group-level standard deviations (if applicable)
+  prior(exponential(1), class = sd)
+)
+
+chains  <- 4 
+
+mod_LDT <- brm(formula = RT ~ L1_f + condition_f + vocab_sc + relate_f + recall_f +(1 | ID) + (1 | prime), family = lognormal(), iter = 5000, chains = chains, cores = chains, data = dat_day_3_online, backend = "cmdstanr", file = "./data/processed/regression_model_day_3_LDT", prior = priors)
+
+```
+
+```{r, warning=F, message=F, echo=T, results='asis'}
+mod_LDT <- readRDS("./data/processed/regression_model_day_3_LDT.rds")
+
+extended_summary(fit = mod_LDT, highlight = TRUE, remove.intercepts = TRUE,
+            print.name = FALSE)
+```
+
+#### Contrasts
+
+```{r, warning=F, message=F, echo=T, results='asis'}
+
+contrasts_LDT <- as.data.frame(emmeans(mod_LDT, pairwise ~ condition_f)$contrasts)
+
+names(contrasts_LDT)[3:4] <- c("l-95% CI", "u-95% CI")
+
+coef_table <- html_format_coef_table(contrasts_LDT, highlight = TRUE, fill = viridis(10)[7])
+
+print(coef_table)
+
+```
+
+
+## PLDT
+
+### Day 2
+```{r, eval = FALSE, warning=F, message=F, echo=T}
+
+str(dat_day_2_pldt)
+
+dat_day_2_pldt$condition_f <- factor(as.character(dat_day_2_pldt$Condition))
+levels(dat_day_2_pldt$condition_f) <- c("Linguistic", "Bioacoustic", "Combined")
+
+dat_day_2_pldt$relate_f <- factor(as.character(dat_day_2_pldt$Related))
+levels(dat_day_2_pldt$relate_f) <- c("Related", "Unrelated", "Nonword")
+
+dat_day_2_pldt$ID <- factor(as.character(dat_day_2_pldt$ID))
+
+dat_day_2_pldt$L1_f <- factor(as.character(dat_day_2_pldt$L1))
+
+levels(dat_day_2_pldt$L1_f) <- c("Native", "Non-native")
+
+dat_day_2_pldt$vocab_sc <- scale(dat_day_2_pldt$Vocab)
+
+dat_day_2_pldt$recall_f <- factor(as.character(dat_day_2_pldt$Recall))
+
+levels(dat_day_2_pldt$recall_f) <- c("No", "Yes")
+
+priors <- c(
+  # Prior for the intercept
+  prior(normal(0, 10), class = Intercept),
+  
+  # Priors for the regression coefficients
+  prior(normal(0, 2.5), class = b),
+  
+  # Prior for the group-level standard deviations (if applicable)
+  prior(exponential(1), class = sd)
+)
+
+chains  <- 4 
+
+mod_PLDT2 <- brm(formula = RT ~ L1_f + condition_f + vocab_sc + relate_f + recall_f +(1 | ID) + (1 | prime), family = lognormal(), iter = 5000, chains = chains, cores = chains, data = dat_day_2_pldt, backend = "cmdstanr", file = "./data/processed/regression_model_day_2_PLDT", prior = priors)
+
+```
+
+```{r, warning=F, message=F, echo=T, results='asis'}
+mod_PLDT2 <- readRDS("./data/processed/regression_model_day_2_PLDT.rds")
+
+extended_summary(fit = mod_PLDT2, highlight = TRUE, remove.intercepts = TRUE,
+            print.name = FALSE)
+```
+
+#### Contrasts
+
+```{r, warning=F, message=F, echo=T, results='asis'}
+
+contrasts_PLDT <- as.data.frame(emmeans(mod_PLDT2, pairwise ~ condition_f)$contrasts)
+
+names(contrasts_PLDT)[3:4] <- c("l-95% CI", "u-95% CI")
+
+coef_table <- html_format_coef_table(contrasts_PLDT, highlight = TRUE, fill = viridis(10)[7])
+
+print(coef_table)
+
+```
+
+### Day 3
+```{r, eval = FALSE, warning=F, message=F, echo=T}
+
+str(dat_day_3_pldt)
+
+dat_day_3_pldt$condition_f <- factor(as.character(dat_day_3_pldt$Condition))
+levels(dat_day_3_pldt$condition_f) <- c("Linguistic", "Bioacoustic", "Combined")
+
+dat_day_3_pldt$relate_f <- factor(as.character(dat_day_3_pldt$Relate))
+levels(dat_day_3_pldt$relate_f) <- c("Related", "Unrelated", "Nonword")
+
+dat_day_3_pldt$ID <- factor(as.character(dat_day_3_pldt$ID))
+
+dat_day_3_pldt$L1_f <- factor(as.character(dat_day_3_pldt$L1))
+
+levels(dat_day_3_pldt$L1_f) <- c("Native", "Non-native")
+
+dat_day_3_pldt$vocab_sc <- scale(dat_day_3_pldt$VocabularyTest)
+
+dat_day_3_pldt$recall_f <- factor(as.character(dat_day_3_pldt$Recall))
+
+levels(dat_day_3_pldt$recall_f) <- c("No", "Yes")
+
+
+priors <- c(
+  # Prior for the intercept
+  prior(normal(0, 10), class = Intercept),
+  
+  # Priors for the regression coefficients
+  prior(normal(0, 2.5), class = b),
+  
+  # Prior for the group-level standard deviations (if applicable)
+  prior(exponential(1), class = sd)
+)
+
+chains  <- 4 
+
+mod_LDT <- brm(formula = RT ~ L1_f + condition_f + vocab_sc + relate_f + recall_f +(1 | ID) + (1 | prime), family = lognormal(), iter = 5000, chains = chains, cores = chains, data = dat_day_3_pldt, backend = "cmdstanr", file = "./data/processed/regression_model_day_3_PLDT", prior = priors)
+
+```
+
+```{r, warning=F, message=F, echo=T, results='asis'}
+mod_PLDT3 <- readRDS("./data/processed/regression_model_day_3_PLDT.rds")
+
+extended_summary(fit = mod_PLDT3, highlight = TRUE, remove.intercepts = TRUE,
+            print.name = FALSE)
+```
+
+#### Contrasts
+
+```{r, warning=F, message=F, echo=T, results='asis'}
+
+contrasts_PLDT3 <- as.data.frame(emmeans(mod_PLDT3, pairwise ~ condition_f)$contrasts)
+
+names(contrasts_PLDT3)[3:4] <- c("l-95% CI", "u-95% CI")
+
+coef_table <- html_format_coef_table(contrasts_PLDT3, highlight = TRUE, fill = viridis(10)[7])
+
+print(coef_table)
+
+```
+
+::: {.alert .alert-success}
+
+# Takeaways {.unnumbered .unlisted}
+
+
+::: 
+
+&nbsp;
+
+<!-- '---' adds a gray vertical line -->
+
+---
+
+&nbsp; 
+ 
+ <!-- add packages used, system details and versions  -->
+ 
+# Session information {.unnumbered .unlisted}
+
+```{r session info, echo=F}
+
+sessionInfo()
+
+```

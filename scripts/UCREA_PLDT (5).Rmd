@@ -1,0 +1,107 @@
+---
+title: "UCREA_PLDT"
+author: "Verónica García Castro"
+date: "2024-01-18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+library(lme4)
+library (foreign)
+library (reshape)
+library (arm)
+library (psy)
+library (car)
+library (plyr)
+library (psychometric)
+library (ICC)
+library (ppcor)
+library (Hmisc)
+library (lm.beta)
+library (GeneNet)
+library (psych)
+library(sjPlot)
+library(stargazer)
+library(dplyr)
+library(tidyverse)
+library(corrplot)
+source("http://www.sthda.com/upload/rquery_cormat.r")
+library(mice)
+
+#Day2
+
+#Read in data file
+
+library(readxl)
+UCREA_day2_PLDT_Acu <- read_excel ("PLDT_day2_Accu_FINAL (2).xlsx")
+View(UCREA_day2_PLDT_Acu)
+
+#Normality Accuracy 
+
+describe(UCREA_day2_PLDT_Acu$Accu)
+hist(UCREA_day2_PLDT_Acu$Accu) #normal
+
+#GLM Accuracy
+Accu=glm(Accu~Related+L1+Condition+VocabularyTest+Recall,data=UCREA_day2_PLDT_Acu,family="binomial")
+summary(Accu)
+tab_model(Accu)
+
+
+# Regressions RTs
+
+RTs_day2 <- read_excel("PLDT_day2RT_processed (1).xlsx")
+
+
+model1 <- lmerTest::lmer(RT_lg ~ L1 + Vocab_lg + Related + Condition + Recall +(1 | ID) + (1 | prime),  data= RTs_day2)
+summary(model1)
+tab_model(model1)
+confint(model1, method="Wald", level=0.95)
+
+
+#Day3
+
+#Read in data file
+
+library(readxl)
+day3_PLDT_Acu <- read_excel("~/2024/PLDT_day3_Accu (1).xlsx")
+View(day3_PLDT_Acu)
+
+
+#Normality Accuracy 
+
+describe(day3_PLDT_Acu$Accu)
+hist(day3_PLDT_Acu$Accu) #normal
+
+#GLM Accuracy
+Accu=glm(Accu~Relate+L1+Condition+Recall+VocabularyTest,data=day3_PLDT_Acu,family="binomial")
+summary(Accu)
+tab_model(Accu)
+
+# Regressions RTs
+
+PLDT_day3<- read_excel ("PLDT_day3_R_FINAL (1).xlsx")
+View(PLDT_day3)
+
+#Normality checks
+
+describe(PLDT_day3$VocabularyTest)
+hist(PLDT_day3$VocabularyTest)
+
+model2 <- lmerTest::lmer(RT_lg ~ L1 + VocabularyTest + Relate + Condition + Recall +(1 | ID) + (1 | prime),  data= PLDT_day3)
+summary(model2)
+tab_model(model2)
+confint(model1, method="Wald", level=0.95)
+
+
+#scale to avoid scaling issues
+
+PLDT_day3$VocabularyTest_scaled <- scale(PLDT_day3$VocabularyTest)
+
+model3 <- lmerTest::lmer(RT_lg ~ L1 + VocabularyTest_scaled + Relate + Condition + Recall +(1 | ID) + (1 | prime),  data= PLDT_day3)
+summary(model3)
+tab_model(model3)
+confint(model1, method="Wald", level=0.95)
+
