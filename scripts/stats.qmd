@@ -84,7 +84,6 @@ flowchart
   D --> E(Model summary) 
 
 style A fill:#44015466
-style B fill:#3E4A894D
 style C fill:#26828E4D
 style D fill:#6DCD594D
 
