@@ -4,7 +4,7 @@ subtitle: Bioacoustics stimuli for L2 learning
 author: <a href="http://researcher.website.com/">Researcher name</a>
 date: "`r Sys.Date()`"
 toc: true
-toc-depth: 4
+toc-depth: 6
 toc-location: left
 number-sections: true
 highlight-style: pygments
@@ -55,9 +55,7 @@ knitr::opts_chunk$set(
 
 # Purpose {.unnumbered .unlisted}
 
-- The first goal of this report
-
-- The second goal of this report
+-  Run stats on L2 test using bioacoustic stimuli
 
 :::
 
@@ -81,8 +79,7 @@ knitr::opts_chunk$set(
 # Analysis flowchart {.unnumbered .unlisted}
 ```{mermaid, fig.align = "center"}
 flowchart
-  A[Read data] --> B(Format data) 
-  B --> C(Graphs)
+  A[Read data] --> C(Format data) 
   C --> D(Statistical analysis)
   D --> E(Model summary) 
 
@@ -120,6 +117,10 @@ dat_day_3_online <- read_excel("./data/raw/UCREA_day3_LDT_Acu_FINAL (1).xlsx")
 dat_day_2_pldt <- read_excel("./data/raw/PLDT_day2RT_processed (1).xlsx")
 
 dat_day_3_pldt <- read_excel("./data/raw/PLDT_day3_R_FINAL (1).xlsx", sheet = "Data")
+
+dat_day_2_pldt_accu <- read_excel("./data/raw/PLDT_day2_Accu_FINAL (2).xlsx")
+
+dat_day_2_ldt_accu <- read_excel("./data/raw/UCREA_day2_LDT_Acu_R_FINAL.xlsx")
 
 ```
 
@@ -165,7 +166,7 @@ mod_recall <- brm(formula = Recall ~ condition_f * L1_f + vocab_sc + (1 | ID) + 
 mod_recognition <- readRDS("./data/processed/regression_model_day_1_recognition.rds")
 
 extended_summary(fit = mod_recognition, highlight = TRUE, remove.intercepts = TRUE,
-            print.name = FALSE)
+             print.name = FALSE, fill = viridis(10)[8])
 ```
 
 ### Contrasts
@@ -176,7 +177,7 @@ contrasts_recognition <- as.data.frame(emmeans(mod_recognition, pairwise ~ condi
 
 names(contrasts_recognition)[3:4] <- c("l-95% CI", "u-95% CI")
 
-coef_table <- html_format_coef_table(contrasts_recognition, highlight = TRUE, fill = viridis(10)[7])
+coef_table <- html_format_coef_table(contrasts_recognition, highlight = TRUE, fill = viridis(10)[8])
 
 print(coef_table)
 ```
@@ -188,7 +189,7 @@ contrasts_recognition$second <- sapply(strsplit(contrasts_recognition$contrast, 
 
 contrasts_recognition <- contrasts_recognition[!grepl("Non-native", contrasts_recognition$first) & grepl("Non-native", contrasts_recognition$second), ]
 
-coef_table <- html_format_coef_table(contrasts_recognition[, 1:4], highlight = TRUE, fill = viridis(10)[7])
+coef_table <- html_format_coef_table(contrasts_recognition[, 1:4], highlight = TRUE, fill = viridis(10)[8])
 
 print(coef_table)
 
@@ -229,7 +230,7 @@ mod_recall <- brm(formula = Recall ~ condition_f * L1_f + vocab_sc + (1 | ID) + 
 mod_recall <- readRDS("./data/processed/regression_model_day_1_recall.rds")
 
 extended_summary(fit = mod_recall, highlight = TRUE, remove.intercepts = TRUE,
-            print.name = FALSE)
+             print.name = FALSE, fill = viridis(10)[8])
 ```
 
 ### Contrasts
@@ -240,7 +241,7 @@ constrasts_recall <- as.data.frame(emmeans(mod_recall, pairwise ~ condition_f * 
 
 names(constrasts_recall)[3:4] <- c("l-95% CI", "u-95% CI")
 
-coef_table <- html_format_coef_table(constrasts_recall[, 1:4], highlight = TRUE, fill = viridis(10)[7])
+coef_table <- html_format_coef_table(constrasts_recall[, 1:4], highlight = TRUE, fill = viridis(10)[8])
 
 print(coef_table)
 ```
@@ -252,7 +253,7 @@ constrasts_recall$second <- sapply(strsplit(constrasts_recall$contrast, " - "), 
 
 constrasts_recall <- constrasts_recall[!grepl("Non-native", constrasts_recall$first) & grepl("Non-native", constrasts_recall$second), ]
 
-coef_table <- html_format_coef_table(constrasts_recall[, 1:4], highlight = TRUE, fill = viridis(10)[7])
+coef_table <- html_format_coef_table(constrasts_recall[, 1:4], highlight = TRUE, fill = viridis(10)[8])
 
 print(coef_table)
 
@@ -263,7 +264,42 @@ print(coef_table)
 ### Day 2
 ```{r, eval = FALSE, warning=F, message=F, echo=T}
 
-str(dat_day_2_online)
+## Offline
+dat_day_2_ldt_accu$condition_f <- factor(as.character(dat_day_2_ldt_accu$Condition))
+dat_day_2_ldt_accu$ID <- factor(as.character(dat_day_2_ldt_accu$ID))
+
+levels(dat_day_2_ldt_accu$condition_f) <- c("Linguistic", "Bioacoustic", "Combined")
+
+dat_day_2_ldt_accu$L1_f <- factor(as.character(dat_day_2_ldt_accu$L1))
+
+levels(dat_day_2_ldt_accu$L1_f) <- c("Native", "Non-native")
+
+dat_day_2_ldt_accu$vocab_sc <- scale(dat_day_2_ldt_accu$Vocab)
+
+dat_day_2_ldt_accu$recall_f <- factor(as.character(dat_day_2_ldt_accu$Recall))
+
+dat_day_2_ldt_accu$relate_f <- factor(as.character(dat_day_2_ldt_accu$Relate))
+levels(dat_day_2_ldt_accu$relate_f) <- c("Related", "Unrelated", "Nonword")
+
+
+priors <- c(prior(normal(0, 4), class = "b"))
+priors <- c(
+  # Prior for the intercept
+  prior(normal(0, 10), class = Intercept),
+  
+  # Priors for the regression coefficients
+  prior(normal(0, 2.5), class = b),
+  
+  # Prior for the group-level standard deviations (if applicable)
+  prior(exponential(1), class = sd)
+)
+
+chains  <- 4 
+
+mod_accu_ldt <- brm(formula = Accuracy ~ condition_f * L1_f + vocab_sc + relate_f + recall_f + (1 | ID) + (1 | prime), family = bernoulli(), iter = 5000, chains = chains, cores = chains, data = dat_day_2_ldt_accu, backend = "cmdstanr", file = "./data/processed/regression_model_day_2_LDT_offline_accuracy", prior = priors)
+
+
+## Online
 
 dat_day_2_online$condition_f <- factor(as.character(dat_day_2_online$Condition))
 levels(dat_day_2_online$condition_f) <- c("Linguistic", "Bioacoustic", "Combined")
@@ -300,14 +336,39 @@ mod_LDT <- brm(formula = RT ~ L1_f + condition_f + vocab_sc + relate_f + recall_
 
 ```
 
+#### Offline
+
+```{r, warning=F, message=F, echo=T, results='asis'}
+mod_LDT_accuracy <- readRDS("./data/processed/regression_model_day_2_LDT_offline_accuracy.rds")
+
+extended_summary(fit = mod_LDT_accuracy, highlight = TRUE, remove.intercepts = TRUE,
+            print.name = FALSE, fill = viridis(10)[8])
+```
+
+##### Contrasts
+
+```{r, warning=F, message=F, echo=T, results='asis'}
+
+contrasts_LDT_acc <- as.data.frame(emmeans(mod_LDT_accuracy, pairwise ~ condition_f)$contrasts)
+
+names(contrasts_LDT_acc)[3:4] <- c("l-95% CI", "u-95% CI")
+
+coef_table <- html_format_coef_table(contrasts_LDT_acc, highlight = TRUE, fill = viridis(10)[8])
+
+print(coef_table)
+
+```
+
+
+#### Online
 ```{r, warning=F, message=F, echo=T, results='asis'}
 mod_LDT <- readRDS("./data/processed/regression_model_day_2_LDT.rds")
 
 extended_summary(fit = mod_LDT, highlight = TRUE, remove.intercepts = TRUE,
-            print.name = FALSE)
+             print.name = FALSE, fill = viridis(10)[8])
 ```
 
-#### Contrasts
+##### Contrasts
 
 ```{r, warning=F, message=F, echo=T, results='asis'}
 
@@ -315,7 +376,7 @@ contrasts_LDT <- as.data.frame(emmeans(mod_LDT, pairwise ~ condition_f)$contrast
 
 names(contrasts_LDT)[3:4] <- c("l-95% CI", "u-95% CI")
 
-coef_table <- html_format_coef_table(contrasts_LDT, highlight = TRUE, fill = viridis(10)[7])
+coef_table <- html_format_coef_table(contrasts_LDT, highlight = TRUE, fill = viridis(10)[8])
 
 print(coef_table)
 
@@ -366,7 +427,7 @@ mod_LDT <- brm(formula = RT ~ L1_f + condition_f + vocab_sc + relate_f + recall_
 mod_LDT <- readRDS("./data/processed/regression_model_day_3_LDT.rds")
 
 extended_summary(fit = mod_LDT, highlight = TRUE, remove.intercepts = TRUE,
-            print.name = FALSE)
+             print.name = FALSE, fill = viridis(10)[8])
 ```
 
 #### Contrasts
@@ -377,7 +438,7 @@ contrasts_LDT <- as.data.frame(emmeans(mod_LDT, pairwise ~ condition_f)$contrast
 
 names(contrasts_LDT)[3:4] <- c("l-95% CI", "u-95% CI")
 
-coef_table <- html_format_coef_table(contrasts_LDT, highlight = TRUE, fill = viridis(10)[7])
+coef_table <- html_format_coef_table(contrasts_LDT, highlight = TRUE, fill = viridis(10)[8])
 
 print(coef_table)
 
@@ -389,7 +450,43 @@ print(coef_table)
 ### Day 2
 ```{r, eval = FALSE, warning=F, message=F, echo=T}
 
-str(dat_day_2_pldt)
+## Offline
+
+dat_day_2_pldt_accu$condition_f <- factor(as.character(dat_day_2_pldt_accu$Condition))
+dat_day_2_pldt_accu$ID <- factor(as.character(dat_day_2_pldt_accu$ID))
+
+levels(dat_day_2_pldt_accu$condition_f) <- c("Linguistic", "Bioacoustic", "Combined")
+
+dat_day_2_pldt_accu$L1_f <- factor(as.character(dat_day_2_pldt_accu$L1))
+
+levels(dat_day_2_pldt_accu$L1_f) <- c("Native", "Non-native")
+
+dat_day_2_pldt_accu$vocab_sc <- scale(dat_day_2_pldt_accu$Vocab)
+
+dat_day_2_pldt_accu$recall_f <- factor(as.character(dat_day_2_pldt_accu$Recall))
+
+dat_day_2_pldt_accu$relate_f <- factor(as.character(dat_day_2_pldt_accu$Related))
+levels(dat_day_2_pldt_accu$relate_f) <- c("Related", "Unrelated", "Nonword")
+
+
+priors <- c(prior(normal(0, 4), class = "b"))
+priors <- c(
+  # Prior for the intercept
+  prior(normal(0, 10), class = Intercept),
+  
+  # Priors for the regression coefficients
+  prior(normal(0, 2.5), class = b),
+  
+  # Prior for the group-level standard deviations (if applicable)
+  prior(exponential(1), class = sd)
+)
+
+chains  <- 4 
+
+mod_accu_pldt <- brm(formula = Accu ~ condition_f * L1_f + vocab_sc + relate_f + recall_f + (1 | ID) + (1 | prime), family = bernoulli(), iter = 5000, chains = chains, cores = chains, data = dat_day_2_pldt_accu, backend = "cmdstanr", file = "./data/processed/regression_model_day_2_PLDT_offline_accuracy", prior = priors)
+
+
+## Online
 
 dat_day_2_pldt$condition_f <- factor(as.character(dat_day_2_pldt$Condition))
 levels(dat_day_2_pldt$condition_f) <- c("Linguistic", "Bioacoustic", "Combined")
@@ -422,18 +519,44 @@ priors <- c(
 
 chains  <- 4 
 
-mod_PLDT2 <- brm(formula = RT ~ L1_f + condition_f + vocab_sc + relate_f + recall_f +(1 | ID) + (1 | prime), family = lognormal(), iter = 5000, chains = chains, cores = chains, data = dat_day_2_pldt, backend = "cmdstanr", file = "./data/processed/regression_model_day_2_PLDT", prior = priors)
+mod_PLDT2 <- brm(formula = RT ~ L1_f + condition_f + vocab_sc + relate_f + recall_f +(1 | ID) + (1 | prime), family = lognormal(), iter = 5000, chains = chains, cores = chains, data = dat_day_2_pldt, backend = "cmdstanr", file = "./data/processed/regression_model_day_2_PLDT_online", prior = priors)
 
 ```
+
+#### Offline
 
 ```{r, warning=F, message=F, echo=T, results='asis'}
-mod_PLDT2 <- readRDS("./data/processed/regression_model_day_2_PLDT.rds")
 
-extended_summary(fit = mod_PLDT2, highlight = TRUE, remove.intercepts = TRUE,
-            print.name = FALSE)
+mod_accu_pldt <- readRDS("./data/processed/regression_model_day_2_PLDT_offline_accuracy.rds")
+
+extended_summary(fit = mod_accu_pldt, highlight = TRUE, remove.intercepts = TRUE,
+             print.name = FALSE, fill = viridis(10)[8])
 ```
 
-#### Contrasts
+##### Contrasts
+
+```{r, warning=F, message=F, echo=T, results='asis'}
+
+contrasts_PLDT <- as.data.frame(emmeans(mod_accu_pldt, pairwise ~ condition_f)$contrasts)
+
+names(contrasts_PLDT)[3:4] <- c("l-95% CI", "u-95% CI")
+
+coef_table <- html_format_coef_table(contrasts_PLDT, highlight = TRUE, fill = viridis(10)[8])
+
+print(coef_table)
+
+```
+
+#### Online 
+
+```{r, warning=F, message=F, echo=T, results='asis'}
+mod_PLDT2 <- readRDS("./data/processed/regression_model_day_2_PLDT_online.rds")
+
+extended_summary(fit = mod_PLDT2, highlight = TRUE, remove.intercepts = TRUE,
+             print.name = FALSE, fill = viridis(10)[8])
+```
+
+##### Contrasts
 
 ```{r, warning=F, message=F, echo=T, results='asis'}
 
@@ -441,7 +564,7 @@ contrasts_PLDT <- as.data.frame(emmeans(mod_PLDT2, pairwise ~ condition_f)$contr
 
 names(contrasts_PLDT)[3:4] <- c("l-95% CI", "u-95% CI")
 
-coef_table <- html_format_coef_table(contrasts_PLDT, highlight = TRUE, fill = viridis(10)[7])
+coef_table <- html_format_coef_table(contrasts_PLDT, highlight = TRUE, fill = viridis(10)[8])
 
 print(coef_table)
 
@@ -492,7 +615,7 @@ mod_LDT <- brm(formula = RT ~ L1_f + condition_f + vocab_sc + relate_f + recall_
 mod_PLDT3 <- readRDS("./data/processed/regression_model_day_3_PLDT.rds")
 
 extended_summary(fit = mod_PLDT3, highlight = TRUE, remove.intercepts = TRUE,
-            print.name = FALSE)
+             print.name = FALSE, fill = viridis(10)[8])
 ```
 
 #### Contrasts
@@ -503,7 +626,7 @@ contrasts_PLDT3 <- as.data.frame(emmeans(mod_PLDT3, pairwise ~ condition_f)$cont
 
 names(contrasts_PLDT3)[3:4] <- c("l-95% CI", "u-95% CI")
 
-coef_table <- html_format_coef_table(contrasts_PLDT3, highlight = TRUE, fill = viridis(10)[7])
+coef_table <- html_format_coef_table(contrasts_PLDT3, highlight = TRUE, fill = viridis(10)[8])
 
 print(coef_table)
 
