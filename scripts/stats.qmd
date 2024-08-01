@@ -59,23 +59,6 @@ knitr::opts_chunk$set(
 
 :::
 
-&nbsp; 
-
-
-<!-- light brown box -->
-::: {.alert .alert-warning}
-
-# Report overview {.unnumbered .unlisted}
-
-- You can have the sections listed here, for instance:
-
-  - [Lorem ipsum](#lorem-ipsum)
-  - [Takeaways](#takeaways)
-
-:::
-
-&nbsp;
-
 # Analysis flowchart {.unnumbered .unlisted}
 ```{mermaid, fig.align = "center"}
 flowchart
